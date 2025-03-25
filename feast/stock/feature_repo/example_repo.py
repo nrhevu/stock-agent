@@ -20,7 +20,7 @@ from feast.on_demand_feature_view import on_demand_feature_view
 from feast.types import Float32, Float64, Int64
 
 # Define a project for the feature repo
-project = Project(name="relative_robin", description="A project for driver statistics")
+project = Project(name="stock", description="A project for driver statistics")
 
 # Define an entity for the driver. You can think of an entity as a primary key used to
 # fetch features.
