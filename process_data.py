@@ -56,12 +56,12 @@ def translate_and_index_to_elk(index_name: str, json_path: str, company: str) ->
         if not title_en:
             logger.warning(f"Translation failed for title: {title_vi[:50]}...")
 
-        # Translate content if present
-        content_en = None
-        if content_vi.strip():
-            content_en = translate_text(content_vi)
-            if not content_en:
-                logger.warning(f"Content translation failed for: {title_vi[:50]}...")
+        # # Translate content if present
+        # content_en = None
+        # if content_vi.strip():
+        #     content_en = translate_text(content_vi)
+        #     if not content_en:
+        #         logger.warning(f"Content translation failed for: {title_vi[:50]}...")
 
         # Parse date
         publish_date = parse_date(publish_date_str)
@@ -74,7 +74,7 @@ def translate_and_index_to_elk(index_name: str, json_path: str, company: str) ->
             'title_vi': title_vi,
             'title_en': title_en,
             'content_vi': content_vi if content_vi.strip() else None,
-            'content_en': content_en,
+            # 'content_en': content_en,
             'publish_date': publish_date,
             'company': company,
             # Include other fields from original data
