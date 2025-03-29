@@ -173,7 +173,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-orchestration/logs
-orchestration/plugins
-
 docker/esdata
