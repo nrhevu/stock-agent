@@ -69,7 +69,7 @@ x-airflow-common:
       condition: service_healthy
 
 services:
-  postgres:
+  postgres-airflow:
     image: postgres:13
     platform: linux/arm64
     environment:
@@ -77,9 +77,26 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
+      - postgres-airflow-db-volume:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  postgres:
+    image: postgres:13
+    platform: linux/arm64
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
       retries: 5
     restart: always
@@ -117,7 +134,7 @@ services:
     ports:
       - 9200:9200
     volumes:
-      - ./docker/esdata:/usr/share/elasticsearch/data
+      - es-data-volume:/usr/share/elasticsearch/data
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.16.3-arm64
@@ -187,4 +204,6 @@ services:
     restart: always
 
 volumes:
-  postgres-db-volume:
+  postgres-db-volume: 
+  postgres-airflow-db-volume:
+  es-data-volume:
