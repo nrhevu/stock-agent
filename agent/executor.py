@@ -20,7 +20,7 @@ try:
         tools=tools,
         verbose=True,
         handle_parsing_errors=True, # Keep this for robustness
-        max_iterations=5 # Reduced iterations for simpler flow
+        # max_iterations=5 # Reduced iterations for simpler flow
     )
     logger.info("Langchain retrieval agent created successfully.")
 except Exception as e:
