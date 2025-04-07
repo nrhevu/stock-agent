@@ -75,12 +75,13 @@ Final Answer:
 
 * **Recent Stock Prices:**
     Successfully retrieved historical stock price data as a DataFrame for MSFT, covering the last 90 days. The DataFrame includes columns: date, open, high, low, close, volume.
-
+    [Paste the exact DataFrame retrieved here.]
+    
 * **Disclaimer:** This information is retrieved from available data sources and is for informational purposes only. It is **NOT financial advice**.
 
 
 Begin!
 
 Question: {input}
-Thought:{agent_scratchpad}
+Thought: {agent_scratchpad}
 """
