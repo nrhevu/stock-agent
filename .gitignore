@@ -128,13 +128,13 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# .env
+# .venv
+# env/
+# venv/
+# ENV/
+# env.bak/
+# venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -173,5 +173,5 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-orchestration/logs
-orchestration/plugins
+docker/esdata
+test.py

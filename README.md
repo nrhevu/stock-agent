@@ -9,3 +9,10 @@ pip install -r requirements.txt
 ```shell
 streamlit run ui/app.py
 ```
+
+# Prepare data
+```shell
+docker-compose -f docker/docker-compose-amd64.yml up -d 
+python process_stock_data.py
+python process_news_data.py
+```

@@ -1,1 +1,10 @@
 streamlit
+elasticsearch
+dotenv
+transformers
+torch
+torchvision
+torchaudio
+sentencepiece
+sacremoses
+tqdm

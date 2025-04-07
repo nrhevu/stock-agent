@@ -1,49 +1,74 @@
+import logging
+import os
 import random
+import sys
 
 import streamlit as st
 
-# Tiêu đề ứng dụng
-st.title('🤖 Hỏi đáp thông tin giá cổ phiếu')
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, project_root)
 
-# Khởi tạo session state để lưu tin nhắn
+from agent.executor import agent_executor
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# --- Streamlit App UI ---
+
+st.title('🤖 Hỏi đáp thông tin giá cổ phiếu')
+st.caption("Powered by Langchain, OpenAI, Elasticsearch, and PostgreSQL")
+
+# Initialize session state for messages
 if 'messages' not in st.session_state:
     st.session_state.messages = []
 
-# Hiển thị lịch sử tin nhắn
+# Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Hàm tạo phản hồi giả lập
-def generate_response(user_message):
-    # Danh sách phản hồi mẫu
-    responses = [
-        "Tôi hiểu rồi.",
-        "Thật là thú vị!",
-        "Bạn có thể nói rõ hơn không?",
-        "Điều đó rất thú vị.",
-        "Tôi không chắc về điều đó."
-    ]
-    return random.choice(responses)
+# Chat input
+if prompt := st.chat_input("Nhập yêu cầu (ví dụ: 'tin tức và giá cổ phiếu google')"):
+    # Add user message to state and display
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-# Ô nhập tin nhắn
-if prompt := st.chat_input("Nhập tin nhắn của bạn"):
-    # Hiển thị tin nhắn của người dùng
-    st.chat_message("user").markdown(prompt)
-    
-    # Lưu tin nhắn của người dùng
-    st.session_state.messages.append({
-        "role": "user", 
-        "content": prompt
-    })
-    
-    # Tạo và hiển thị phản hồi
-    response = generate_response(prompt)
-    with st.chat_message("assistant"):
-        st.markdown(response)
-    
-    # Lưu tin nhắn phản hồi
-    st.session_state.messages.append({
-        "role": "assistant", 
-        "content": response
-    })
+    # Check if agent is initialized before proceeding
+    if agent_executor:
+        # Generate and display assistant response
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty() # Use placeholder for streaming-like effect
+            message_placeholder.markdown("Thinking...")
+            try:
+                # Invoke the agent
+                with st.spinner("Agent is working..."): # Show spinner during execution
+                    response = agent_executor.invoke({"input": prompt})
+                    assistant_response = response.get('output', "Sorry, I encountered an issue and couldn't get a response.")
+
+                # Display the final response
+                message_placeholder.markdown(assistant_response)
+                # Add assistant response to chat history
+                st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+
+            except Exception as e:
+                logger.error(f"Error during agent execution: {e}", exc_info=True)
+                error_message = f"Sorry, an error occurred while processing your request: {e}"
+                message_placeholder.error(error_message) # Display error in the chat
+                st.session_state.messages.append({"role": "assistant", "content": error_message})
+    else:
+        # Handle case where agent failed to initialize
+        st.error("The agent could not be initialized. Please check the logs or environment configuration.")
+        # Add error message to chat history
+        error_msg_init = "Error: Agent initialization failed. Cannot process request."
+        st.session_state.messages.append({"role": "assistant", "content": error_msg_init})
+        with st.chat_message("assistant"):
+             st.error(error_msg_init)
+
+
+# Optional: Add a button to clear chat history
+if st.button("Clear Chat History"):
+    st.session_state.messages = []
+    st.rerun()
