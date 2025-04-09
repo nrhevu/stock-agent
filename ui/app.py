@@ -8,7 +8,7 @@ import streamlit as st
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from agent.executor import agent_executor
+from core.executor import agent_executor
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

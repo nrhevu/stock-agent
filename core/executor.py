@@ -3,9 +3,9 @@ import logging
 from langchain import hub
 from langchain.agents import AgentExecutor, create_react_agent
 
-from agent import llm
-from agent.parser import CustomOutputParser
-from agent.prompts import prompt, tools
+from core import llm
+from core.parser import CustomOutputParser
+from core.prompts import prompt, tools
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

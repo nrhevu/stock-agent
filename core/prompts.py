@@ -2,7 +2,7 @@ import logging
 
 from langchain import hub
 
-from agent.tools import retrieve_news_articles, retrieve_stock_prices_dataframe
+from core.tools import retrieve_news_articles, retrieve_stock_prices_dataframe
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

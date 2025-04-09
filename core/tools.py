@@ -11,7 +11,7 @@ from langchain.pydantic_v1 import BaseModel, Field
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 
-from agent import ARTICLE_INDEX_NAME, PRICE_TABLE_NAME, es_utils, pg_utils
+from core import ARTICLE_INDEX_NAME, PRICE_TABLE_NAME, es_utils, pg_utils
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
