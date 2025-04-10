@@ -56,4 +56,7 @@ pg_utils = PostgresUtils(**db_params)
 es_utils = ElasticsearchUtils()
 
 # --- Initialize LLM ---
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2)
+# llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.2)
+llm_master = ChatOpenAI(model="gpt-4-turbo", temperature=0.2)
+llm_retrieval = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1)
+llm_analysis = ChatOpenAI(model="gpt-4-turbo", temperature=0.1)

@@ -32,9 +32,8 @@ class NewsSearchInput(BaseModel):
     )
 
 
-@tool("retrieve_news_articles", args_schema=NewsSearchInput)
+# @tool("retrieve_news_articles", args_schema=NewsSearchInput)
 def retrieve_news_articles(
-    str_args,
     company_name: str,
     days_ago: int = 7,
     max_results: int = 3,
@@ -116,7 +115,7 @@ class StockPriceDFInput(BaseModel):
     )
 
 
-@tool("retrieve_stock_prices_dataframe", args_schema=StockPriceDFInput)
+# @tool("retrieve_stock_prices_dataframe", args_schema=StockPriceDFInput)
 def retrieve_stock_prices_dataframe(
     # str_args,
     ticker: str,

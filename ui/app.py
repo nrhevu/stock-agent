@@ -8,7 +8,7 @@ import streamlit as st
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from core.executor import agent_executor
+from core.executor import agent_executor, stock_agent
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -45,8 +45,10 @@ if prompt := st.chat_input("Nhập yêu cầu (ví dụ: 'tin tức và giá c�
             try:
                 # Invoke the agent
                 with st.spinner("Agent is working..."): # Show spinner during execution
-                    response = agent_executor.invoke({"input": prompt})
-                    assistant_response = response.get('output', "Sorry, I encountered an issue and couldn't get a response.")
+                    # response = agent_executor.invoke({"input": prompt})
+                    # assistant_response = response.get('output', "Sorry, I encountered an issue and couldn't get a response.")
+                    response = stock_agent.run(prompt, use_agent=False)
+                    assistant_response = response.get('prediction', "Sorry, I encountered an issue and couldn't get a response.")
 
                 # Display the final response
                 message_placeholder.markdown(assistant_response)
