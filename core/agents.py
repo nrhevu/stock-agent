@@ -201,6 +201,7 @@ class StockDataRetrievalAgent:
             
             # Volatility measure
             daily_returns = df['close'].pct_change().dropna()
+            daily_returns = daily_returns.astype(float)
             volatility = daily_returns.std() * 100
             summary += f"Daily volatility: {volatility:.2f}%\n\n"
             
