@@ -114,16 +114,16 @@ services:
     restart: always
 
   # Feast Feature Store
-  feast:
-    image: python:3.9-slim
-    platform: linux/amd64
-    volumes:
-      - ./feast:/app
-    working_dir: /app
-    command: >
-      bash -c "pip install feast && feast init stock"
-    ports:
-      - "6565:6565"
+  # feast:
+  #   image: python:3.9-slim
+  #   platform: linux/amd64
+  #   volumes:
+  #     - ./feast:/app
+  #   working_dir: /app
+  #   command: >
+  #     bash -c "pip install feast && feast init stock"
+  #   ports:
+  #     - "6565:6565"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.16.0
