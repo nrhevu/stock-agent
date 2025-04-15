@@ -1,19 +1,50 @@
 import yfinance as yf
 import pandas as pd
 
-# Danh sách cổ phiếu cần lấy dữ liệu
-stocks = ["NVDA", "GOOGL", "MSFT"]
+def crawl_monthly_stock(tickers = ['MSFT', 'NVDA', 'GOOGL'], period="6mo"):
+    """_summary_
 
-# Thời gian lấy dữ liệu (1 năm gần nhất)
-start_date = "2000-01-01"
-end_date = "2025-03-25"
+    Args:
+        tickers (list, optional): _description_. Defaults to ['MSFT', 'NVDA', 'GOOGL'].
+        period (str, optional): _description_. Defaults to "6mo". Choice: [1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max]
+    Return:
+        results: (object): {
+            "Ticker": ticker_df
+        }
+    """
+    results = {}
+    data = yf.download(tickers, period=period, interval="1mo")
 
-# Lấy dữ liệu cho từng cổ phiếu
-for stock in stocks:
-    df = yf.download(stock, start=start_date, end=end_date, interval="1mo")  # Lấy dữ liệu theo tháng
-    df.to_csv(f"{stock}_1year_monthly.csv")  # Lưu vào file CSV
-    print(f"Đã lưu dữ liệu {stock} vào file {stock}_1year_monthly.csv")
+    # -- 2 & 3. Tiền xử lý dữ liệu --
+    results = {}
+    df_all = pd.DataFrame()
+    for ticker in tickers:
 
-# Hiển thị dữ liệu của Nvidia
-df_nvda = pd.read_csv("NVDA_1year_monthly.csv")
-print(df_nvda.head())
+        df_ticker = data.loc[:, (slice(None), ticker)]
+        df_ticker.columns = df_ticker.columns.droplevel(1) # Bỏ multi-index cột
+        df_ticker.dropna(inplace=True)
+
+        if df_ticker.empty:
+            print(f"Không có đủ dữ liệu cho {ticker} sau khi loại bỏ NaN.")
+            continue
+
+        # 3a. Tạo biến mục tiêu (Target)
+        # Dự đoán giá đóng cửa tháng sau sẽ tăng (1) hay giảm/bằng (0) so với tháng này
+        df_ticker['Target'] = (df_ticker['Close'].shift(-1) > df_ticker['Close']).astype(int)
+        df_ticker.dropna(inplace=True)
+
+        if df_ticker.empty:
+            print(f"Không có đủ dữ liệu cho {ticker} sau khi tạo target.")
+            continue
+        results[ticker] = df_ticker
+    return results
+def merge_csv(csv_1, csv_2):
+    df1 = pd.read_csv(csv_1)
+    df2 = pd.read_csv(csv_2)
+
+    # Gộp theo chiều dọc (nối dòng)
+    merged_df = pd.concat([df1, df2], ignore_index=True)
+    return merged_df
+if __name__ == "__main__":
+    df = crawl_monthly_stock()
+    print(df)
