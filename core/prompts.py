@@ -1,6 +1,7 @@
 import logging
 
 from langchain import hub
+from langchain.prompts import ChatPromptTemplate
 
 from core.tools import retrieve_news_articles, retrieve_stock_prices_dataframe
 
@@ -9,76 +10,189 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# List only the retrieval tools
+# List the retrieval tools
 tools = [
     retrieve_news_articles,
     retrieve_stock_prices_dataframe
 ]
 
-# Get the ReAct prompt template
-prompt = hub.pull("hwchase17/react")
+# Get the ReAct prompt template for the agent
+react_prompt = hub.pull("hwchase17/react")
 
-# Customize the prompt template for RETRIEVAL ONLY
-prompt.template = """
-You are an AI assistant designed solely for retrieving financial news and stock price data.
+# Intent-specific prompts
+company_identifier_prompt = ChatPromptTemplate.from_template("""
+You are a financial entity recognition specialist. Extract the company name and stock ticker from the query.
+
+USER QUERY: {query}
+
+Return ONLY a JSON object with these fields:
+- company_name: The full name of the company
+- ticker: The stock ticker symbol
+
+If uncertain about any field, use "unknown" as the value.
+""")
+
+intent_recognition_prompt = ChatPromptTemplate.from_template("""
+You are an intent recognition specialist for a financial assistant. Determine the primary intent of the user's query.
+
+USER QUERY: {query}
+
+Possible intents:
+1. retrieve_news - User wants news articles about a company
+2. retrieve_stock - User wants stock price data for a company
+3. analyze_stock - User wants analysis combining news and stock data
+
+Return ONLY a JSON object with these fields:
+- intent: The primary intent (one of: retrieve_news, retrieve_stock, analyze_stock)
+- confidence: A number between 0 and 1 indicating your confidence
+- company_focus: true/false - whether the query focuses on a specific company
+
+If the intent is unclear, use "unknown" as the intent value.
+""")
+
+news_retrieval_prompt = ChatPromptTemplate.from_template("""
+You are a financial news curator. Review these news articles about {company_name} and extract the most relevant 
+information for stock price prediction.
+
+ORIGINAL NEWS DATA:
+{raw_news}
+
+Create a concise summary of the key points, focusing on:
+1. Market sentiment (positive/negative/neutral)
+2. Major news events or announcements
+3. Financial performance indicators
+4. Industry trends affecting the company
+
+FORMAT YOUR RESPONSE AS:
+SUMMARY:
+[Your concise summary here]
+
+KEY DEVELOPMENTS:
+- [Key point 1]
+- [Key point 2]
+- [Key point 3]
+
+SENTIMENT: [Overall sentiment: POSITIVE/NEGATIVE/NEUTRAL/MIXED]
+""")
+
+stock_data_prompt = ChatPromptTemplate.from_template("""
+You are a technical stock analyst. Review this price data for {ticker} and extract key technical indicators and patterns.
+
+RAW PRICE DATA SUMMARY:
+{price_summary}
+
+Create a concise technical analysis, focusing on:
+1. Overall trend (bullish/bearish/neutral)
+2. Key support and resistance levels
+3. Volume patterns and anomalies
+4. Recent momentum indicators
+5. Volatility analysis
+
+FORMAT YOUR RESPONSE AS:
+TECHNICAL INDICATORS:
+[Your concise technical analysis here]
+
+KEY LEVELS:
+- Support: [list key support levels]
+- Resistance: [list key resistance levels]
+
+VOLUME ANALYSIS:
+[Brief volume analysis]
+
+MOMENTUM: [INCREASING/DECREASING/STABLE]
+""")
+
+stock_analysis_prompt = ChatPromptTemplate.from_template("""
+# Stock Trend Analysis and Prediction
+
+## Company Information
+- Company Name: {company_name}
+- Ticker Symbol: {ticker}
+
+## News Analysis
+{processed_news}
+
+## Technical Analysis
+{technical_analysis}
+
+## Your Task
+As a financial analyst, synthesize the news sentiment and technical analysis to predict 
+the stock price direction for {ticker} in the coming days.
+
+Follow these steps:
+1. Compare the news sentiment with technical indicators
+2. Identify confirmation or contradiction between news and price data
+3. Determine the most likely price direction based on all available information
+4. Assign a confidence level to your prediction
+5. Explain your reasoning in clear, concise terms
+
+FORMAT YOUR RESPONSE AS:
+
+# PREDICTION FOR {ticker}
+
+## DIRECTION: [UP/DOWN/NEUTRAL]
+
+## CONFIDENCE: [HIGH/MEDIUM/LOW]
+
+## RATIONALE:
+[Your concise explanation of 2-3 paragraphs]
+
+## KEY FACTORS:
+1. [Factor 1]
+2. [Factor 2]
+3. [Factor 3]
+4. [Factor 4]
+
+## POTENTIAL RISKS:
+- [Risk 1]
+- [Risk 2]
+""")
+
+# Master agent prompt with intent recognition
+master_agent_prompt = ChatPromptTemplate.from_template("""
+You are MasterStock, an expert financial system coordinator. Your role is to handle user requests about stocks and financial data.
+
+USER QUERY: {query}
+
+To handle this request effectively:
+
+1. First, identify the user's intent (retrieve news, retrieve stock data, or analyze)
+2. Then identify the company and ticker symbol
+3. Based on the intent, execute the appropriate workflow:
+   - For news retrieval: gather and process news data
+   - For stock data retrieval: gather and analyze stock price history
+   - For analysis: gather both news and stock data, then generate a prediction
+
+As you progress through each step, maintain context by referencing the results from previous steps.
+Be thorough but avoid unnecessary repetition.
+
+NOTE: You must execute tasks in the proper sequence - don't try to analyze before you have the necessary data.
+
+Begin by identifying the intent, then proceed step by step.
+""")
+
+# Customize the ReAct prompt template for the agent
+react_prompt.template = """
+You are an AI assistant designed for financial data retrieval and analysis. Your goal is to help users get information about stocks and companies.
 You MUST use the provided tools following the exact Thought -> Action -> Action Input -> Observation cycle.
-You MUST NOT provide financial advice, analysis, opinions, or summaries beyond presenting the raw retrieved data as described.
 
 Available Tools:
 {tools}
 
 Tool Usage Flow:
-1.  Identify the company name (for news) and/or stock ticker (for prices) from the user's question.
-2.  Use `retrieve_news_articles` to get recent news snippets about the specified **company_name**. This tool returns a formatted string containing article details or a message if none are found.
-3.  Use `retrieve_stock_prices_dataframe` to get historical stock price data for the specified **ticker**. This tool returns a confirmation message indicating successful retrieval of a Pandas DataFrame object (or an error string).
-4.  Follow the ReAct cycle strictly for each step needed to gather information.
+1. First, identify the user's intent using the `identify_intent` tool.
+2. Then identify the company and ticker symbol using the `identify_company` tool.
+3. Based on the intent:
+   - For news retrieval: use `retrieve_news` to get news articles
+   - For stock data retrieval: use `retrieve_stock_data` to get price data
+   - For analysis: use both retrieval tools, then use `analyze_stock` to generate a prediction
 
-**CRITICAL FINAL STEP FORMATTING:**
-After you have gathered ALL necessary information (i.e., after the 'Observation' from the *last* required tool call), your response MUST be formatted EXACTLY like this:
-
-Thought: [Your brief final thought process summarizing that all data is gathered and you are now constructing the final output. For example: "I have retrieved the news snippets (or found no news) and the stock price data confirmation. I will now format the final answer."]
-Final Answer:
-**Information for [Company Name] ([Ticker]):**
-
-* **Recent News:**
-    [Paste the exact news snippets string retrieved here. If the observation indicated no news was found, state clearly: "No recent news articles found for '[Company Name]' in the specified period."]
-
-* **Recent Stock Prices:**
-    [Paste the exact confirmation message from the observation here, for example: "Successfully retrieved historical stock price data as a DataFrame for [Ticker], covering the last [X] days. The DataFrame includes columns: date, open, high, low, close, volume." If the tool observation reported an error, state that error.]
-
-* **Disclaimer:** This information is retrieved from available data sources and is for informational purposes only. It is **NOT financial advice**.
-
+4. Follow the ReAct cycle strictly for each step needed to gather information.
 
 **IMPORTANT RULES FOR OUTPUT FORMAT:**
-- Every 'Thought:' MUST be followed immediately by an 'Action:' block, UNLESS it is the final thought just before the 'Final Answer:'.
-- The final response after gathering all data MUST start with 'Thought:', followed immediately by 'Final Answer:'.
-- DO NOT output the final answer text (starting with "**Information for...") directly without the correct preceding 'Thought:' and 'Final Answer:' structure in your last turn.
-- DO NOT stop generating after producing only a 'Thought:' in the final step. Ensure the 'Final Answer:' block follows immediately.
-
-Illustrative Example of Agent Flow (Focus on Structure):
-
-Question: Get news and price for Microsoft (MSFT)
-Thought: The user wants news for 'Microsoft' and prices for 'MSFT'. I need to use retrieve_news_articles for the company and retrieve_stock_prices_dataframe for the ticker. I'll start with news.
-Action: retrieve_news_articles
-Action Input: {{"company_name": "microsoft", "days_ago": 30, "max_results": 3}}
-Observation: Article 1: Microsoft announces... --- Article 2: ...
-Thought: News retrieved successfully as a string. Now I need the stock price data for the ticker MSFT using retrieve_stock_prices_dataframe.
-Action: retrieve_stock_prices_dataframe
-Action Input: {{"ticker": "MSFT", "days_ago": 90}}
-Observation: Successfully retrieved historical stock price data as a DataFrame for MSFT, covering the last 90 days. The DataFrame includes columns: date, open, high, low, close, volume.
-Thought: I have retrieved the news snippets string and the stock price data confirmation message. I have all the information needed and will now format the final answer exactly as specified in the instructions.
-Final Answer:
-**Information for Microsoft (MSFT):**
-
-* **Recent News:**
-    Article 1: Microsoft announces... --- Article 2: ...
-
-* **Recent Stock Prices:**
-    Successfully retrieved historical stock price data as a DataFrame for MSFT, covering the last 90 days. The DataFrame includes columns: date, open, high, low, close, volume.
-    [Paste the exact DataFrame retrieved here.]
-    
-* **Disclaimer:** This information is retrieved from available data sources and is for informational purposes only. It is **NOT financial advice**.
-
+- Every 'Thought:' MUST be followed immediately by an 'Action:' block.
+- The final response after gathering all data MUST start with 'Thought:', followed by 'Final Answer:'.
+- Be thorough but avoid unnecessary repetition.
 
 Begin!
 

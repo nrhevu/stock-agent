@@ -1,12 +1,14 @@
 import json
 import logging
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 import pandas as pd
 from dotenv import load_dotenv
 from langchain import hub
 from langchain.agents import AgentExecutor, Tool, create_react_agent
-from langchain.prompts import ChatPromptTemplate
+from core.prompts import (company_identifier_prompt, intent_recognition_prompt, 
+                         master_agent_prompt, news_retrieval_prompt, react_prompt,
+                         stock_analysis_prompt, stock_data_prompt)
 from langchain.schema import StrOutputParser
 
 from core import (llm_analysis,
@@ -20,6 +22,40 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+# ===== 0. INTENT RECOGNITION AGENT =====
+
+class IntentRecognitionAgent:
+    """Agent responsible for identifying user intent from query"""
+    
+    # Define possible intents
+    INTENT_NEWS = "retrieve_news"
+    INTENT_STOCK = "retrieve_stock"
+    INTENT_ANALYSIS = "analyze_stock"
+    INTENT_UNKNOWN = "unknown"
+    
+    def __init__(self, llm=None):
+        self.llm = llm or llm_retrieval
+        self.chain = intent_recognition_prompt | self.llm | StrOutputParser()
+    
+    def run(self, query: str) -> Dict[str, Any]:
+        """Identify intent from the query"""
+        try:
+            result = self.chain.invoke({"query": query})
+            intent_data = json.loads(result)
+            return {
+                "intent": intent_data.get("intent", self.INTENT_UNKNOWN),
+                "confidence": intent_data.get("confidence", 0.0),
+                "company_focus": intent_data.get("company_focus", False)
+            }
+        except Exception as e:
+            logger.error(f"Error in IntentRecognitionAgent: {e}", exc_info=True)
+            return {
+                "intent": self.INTENT_UNKNOWN,
+                "confidence": 0.0,
+                "company_focus": False,
+                "error": str(e)
+            }
+
 # ===== 1. RETRIEVAL AGENTS =====
 
 class CompanyIdentifierAgent:
@@ -27,18 +63,7 @@ class CompanyIdentifierAgent:
     
     def __init__(self, llm=None):
         self.llm = llm or llm_retrieval
-        self.prompt = ChatPromptTemplate.from_template("""
-        You are a financial entity recognition specialist. Extract the company name and stock ticker from the query.
-        
-        USER QUERY: {query}
-        
-        Return ONLY a JSON object with these fields:
-        - company_name: The full name of the company
-        - ticker: The stock ticker symbol
-        
-        If uncertain about any field, use "unknown" as the value.
-        """)
-        self.chain = self.prompt | self.llm | StrOutputParser()
+        self.chain = company_identifier_prompt | self.llm | StrOutputParser()
     
     def run(self, query: str) -> Dict[str, str]:
         """Identify company and ticker from the query"""
@@ -60,33 +85,8 @@ class NewsRetrievalAgent:
     def __init__(self, llm=None):
         self.llm = llm or llm_retrieval
         
-        # Define prompt for cleaning news data
-        self.cleanup_prompt = ChatPromptTemplate.from_template("""
-        You are a financial news curator. Review these news articles about {company_name} and extract the most relevant 
-        information for stock price prediction.
-        
-        ORIGINAL NEWS DATA:
-        {raw_news}
-        
-        Create a concise summary of the key points, focusing on:
-        1. Market sentiment (positive/negative/neutral)
-        2. Major news events or announcements
-        3. Financial performance indicators
-        4. Industry trends affecting the company
-        
-        FORMAT YOUR RESPONSE AS:
-        SUMMARY:
-        [Your concise summary here]
-        
-        KEY DEVELOPMENTS:
-        - [Key point 1]
-        - [Key point 2]
-        - [Key point 3]
-        
-        SENTIMENT: [Overall sentiment: POSITIVE/NEGATIVE/NEUTRAL/MIXED]
-        """)
-        
-        self.cleanup_chain = self.cleanup_prompt | self.llm | StrOutputParser()
+        # Use the prompt from prompts.py
+        self.cleanup_chain = news_retrieval_prompt | self.llm | StrOutputParser()
     
     def retrieve_raw_news(self, company_name: str, days_ago: int = 30, max_results: int = 5) -> str:
         """Retrieve raw news data using the tool"""
@@ -131,35 +131,8 @@ class StockDataRetrievalAgent:
     def __init__(self, llm=None):
         self.llm = llm or llm_retrieval
         
-        # Define prompt for analyzing price data
-        self.analysis_prompt = ChatPromptTemplate.from_template("""
-        You are a technical stock analyst. Review this price data for {ticker} and extract key technical indicators and patterns.
-        
-        RAW PRICE DATA SUMMARY:
-        {price_summary}
-        
-        Create a concise technical analysis, focusing on:
-        1. Overall trend (bullish/bearish/neutral)
-        2. Key support and resistance levels
-        3. Volume patterns and anomalies
-        4. Recent momentum indicators
-        5. Volatility analysis
-        
-        FORMAT YOUR RESPONSE AS:
-        TECHNICAL INDICATORS:
-        [Your concise technical analysis here]
-        
-        KEY LEVELS:
-        - Support: [list key support levels]
-        - Resistance: [list key resistance levels]
-        
-        VOLUME ANALYSIS:
-        [Brief volume analysis]
-        
-        MOMENTUM: [INCREASING/DECREASING/STABLE]
-        """)
-        
-        self.analysis_chain = self.analysis_prompt | self.llm | StrOutputParser()
+        # Use the prompt from prompts.py
+        self.analysis_chain = stock_data_prompt | self.llm | StrOutputParser()
     
     def retrieve_price_data(self, ticker: str, days_ago: int = 90) -> Union[pd.DataFrame, str]:
         """Retrieve raw stock price data using the tool"""
@@ -270,54 +243,8 @@ class StockAnalysisAgent:
     def __init__(self, llm=None):
         self.llm = llm or llm_analysis
         
-        # Define prompt for final analysis and prediction
-        self.analysis_prompt = ChatPromptTemplate.from_template("""
-        # Stock Trend Analysis and Prediction
-        
-        ## Company Information
-        - Company Name: {company_name}
-        - Ticker Symbol: {ticker}
-        
-        ## News Analysis
-        {processed_news}
-        
-        ## Technical Analysis
-        {technical_analysis}
-        
-        ## Your Task
-        As a financial analyst, synthesize the news sentiment and technical analysis to predict 
-        the stock price direction for {ticker} in the coming days.
-        
-        Follow these steps:
-        1. Compare the news sentiment with technical indicators
-        2. Identify confirmation or contradiction between news and price data
-        3. Determine the most likely price direction based on all available information
-        4. Assign a confidence level to your prediction
-        5. Explain your reasoning in clear, concise terms
-        
-        FORMAT YOUR RESPONSE AS:
-        
-        # PREDICTION FOR {ticker}
-        
-        ## DIRECTION: [UP/DOWN/NEUTRAL]
-        
-        ## CONFIDENCE: [HIGH/MEDIUM/LOW]
-        
-        ## RATIONALE:
-        [Your concise explanation of 2-3 paragraphs]
-        
-        ## KEY FACTORS:
-        1. [Factor 1]
-        2. [Factor 2]
-        3. [Factor 3]
-        4. [Factor 4]
-        
-        ## POTENTIAL RISKS:
-        - [Risk 1]
-        - [Risk 2]
-        """)
-        
-        self.analysis_chain = self.analysis_prompt | self.llm | StrOutputParser()
+        # Use the prompt from prompts.py
+        self.analysis_chain = stock_analysis_prompt | self.llm | StrOutputParser()
     
     def run(self, company_name: str, ticker: str, processed_news: str, technical_analysis: str) -> Dict[str, str]:
         """Generate final stock prediction based on news and technical analysis"""
@@ -342,12 +269,13 @@ class StockAnalysisAgent:
 # ===== 3. MASTER AGENT =====
 
 class StockPredictionMasterAgent:
-    """Master agent that coordinates retrieval and analysis agents"""
+    """Master agent that coordinates retrieval and analysis agents based on user intent"""
     
     def __init__(self, llm=None):
         self.llm = llm or llm_master
         
         # Initialize sub-agents
+        self.intent_recognizer = IntentRecognitionAgent()
         self.company_identifier = CompanyIdentifierAgent()
         self.news_retriever = NewsRetrievalAgent()
         self.stock_data_retriever = StockDataRetrievalAgent()
@@ -355,6 +283,11 @@ class StockPredictionMasterAgent:
         
         # Create tools for REACT agent
         self.tools = [
+            Tool(
+                name="identify_intent",
+                func=self._identify_intent,
+                description="Identifies the user's intent from the query (retrieve news, retrieve stock data, or analyze)"
+            ),
             Tool(
                 name="identify_company",
                 func=self._identify_company,
@@ -377,25 +310,13 @@ class StockPredictionMasterAgent:
             )
         ]
         
-        # Master agent prompt
-        self.prompt = ChatPromptTemplate.from_template("""
-        You are MasterStock, an expert financial prediction system coordinator. Your role is to coordinate a team of specialized agents to predict stock price trends.
-        
-        USER QUERY: {query}
-        
-        To handle this request effectively, break it down into sequential tasks:
-        
-        1. First, identify the company and ticker symbol
-        2. Then gather news data about the company
-        3. Next, retrieve stock price history data
-        4. Finally, analyze all data to make a prediction
-        
-        As you progress through each step, maintain context by referencing the results from previous steps. Be thorough but avoid unnecessary repetition.
-        
-        NOTE: You must execute tasks in the proper sequence - don't try to analyze before you have the necessary data.
-        
-        Begin by identifying the company, then proceed step by step.
-        """)
+        # Use the prompt from prompts.py
+        self.prompt = master_agent_prompt
+    
+    def _identify_intent(self, query: str) -> str:
+        """Tool function to identify intent from query"""
+        result = self.intent_recognizer.run(query)
+        return json.dumps(result)
     
     def _identify_company(self, query: str) -> str:
         """Tool function to identify company from query"""
@@ -419,7 +340,7 @@ class StockPredictionMasterAgent:
     
     def create_agent(self):
         """Create the master REACT agent"""
-        react_prompt = hub.pull("hwchase17/react")
+        # Use the prompt from prompts.py
         
         # Create the agent
         agent = create_react_agent(self.llm, self.tools, react_prompt)
@@ -432,6 +353,97 @@ class StockPredictionMasterAgent:
             handle_parsing_errors=True,
             max_iterations=15  # Limit iterations to prevent infinite loops
         )
+    
+    def run_intent_based(self, query: str, news_days: int = 30, price_days: int = 90) -> Dict[str, Any]:
+        """Run the pipeline based on detected intent"""
+        try:
+            # Step 1: Identify intent
+            logger.info("Step 1: Identifying user intent")
+            intent_info = self.intent_recognizer.run(query)
+            intent = intent_info.get("intent")
+            
+            logger.info(f"Identified intent: {intent}")
+            
+            # Step 2: Identify company and ticker (needed for all intents)
+            logger.info("Step 2: Identifying company and ticker")
+            company_info = self.company_identifier.run(query)
+            company_name = company_info.get("company_name")
+            ticker = company_info.get("ticker")
+            
+            logger.info(f"Identified company: {company_name}, ticker: {ticker}")
+            
+            # Step 3: Execute intent-specific workflow
+            if intent == IntentRecognitionAgent.INTENT_NEWS:
+                # News retrieval intent
+                logger.info("Executing news retrieval workflow")
+                news_result = self.news_retriever.run(company_name, news_days)
+                
+                return {
+                    "query": query,
+                    "intent": intent,
+                    "company_name": company_name,
+                    "ticker": ticker,
+                    "news_data": news_result.get("processed_news"),
+                    "raw_news": news_result.get("raw_news")
+                }
+                
+            elif intent == IntentRecognitionAgent.INTENT_STOCK:
+                # Stock data retrieval intent
+                logger.info("Executing stock data retrieval workflow")
+                stock_result = self.stock_data_retriever.run(ticker, price_days)
+                
+                return {
+                    "query": query,
+                    "intent": intent,
+                    "company_name": company_name,
+                    "ticker": ticker,
+                    "technical_analysis": stock_result.get("technical_analysis"),
+                    "price_summary": stock_result.get("price_summary")
+                }
+                
+            elif intent == IntentRecognitionAgent.INTENT_ANALYSIS:
+                # Full analysis intent
+                logger.info("Executing full analysis workflow")
+                
+                # Get news data
+                news_result = self.news_retriever.run(company_name, news_days)
+                processed_news = news_result.get("processed_news")
+                
+                # Get stock data
+                stock_result = self.stock_data_retriever.run(ticker, price_days)
+                technical_analysis = stock_result.get("technical_analysis")
+                
+                # Generate prediction
+                prediction_result = self.stock_analyst.run(
+                    company_name, 
+                    ticker, 
+                    processed_news, 
+                    technical_analysis
+                )
+                
+                return {
+                    "query": query,
+                    "intent": intent,
+                    "company_name": company_name,
+                    "ticker": ticker,
+                    "news_data": processed_news,
+                    "technical_analysis": technical_analysis,
+                    "prediction": prediction_result.get("prediction"),
+                    "raw_news": news_result.get("raw_news"),
+                    "price_summary": stock_result.get("price_summary")
+                }
+                
+            else:
+                # Unknown intent - run full analysis as fallback
+                logger.info("Unknown intent - running full analysis as fallback")
+                return self.run_sequential(query, news_days, price_days)
+            
+        except Exception as e:
+            logger.error(f"Error in intent-based execution: {e}", exc_info=True)
+            return {
+                "error": f"Failed to complete request: {str(e)}",
+                "query": query
+            }
     
     def run_sequential(self, query: str, news_days: int = 30, price_days: int = 90) -> Dict[str, Any]:
         """Run the full pipeline in sequential mode (without REACT agent)"""
@@ -487,9 +499,11 @@ class StockPredictionMasterAgent:
         agent = self.create_agent()
         return agent.invoke({"input": query})
     
-    def run(self, query: str, news_days: int = 30, price_days: int = 90, use_agent: bool = True) -> Dict[str, Any]:
-        """Run either the sequential or agent-based pipeline"""
+    def run(self, query: str, news_days: int = 30, price_days: int = 90, use_agent: bool = False, use_intent: bool = True) -> Dict[str, Any]:
+        """Run the pipeline using the specified method"""
         if use_agent:
             return self.run_agent(query)
+        elif use_intent:
+            return self.run_intent_based(query, news_days, price_days)
         else:
             return self.run_sequential(query, news_days, price_days)
