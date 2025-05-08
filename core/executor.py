@@ -18,7 +18,7 @@ stock_agent = StockPredictionMasterAgent()
 agent_executor = stock_agent.create_agent()
 
 # Define execution functions for different modes
-def execute_query(query, mode="intent", news_days=30, price_days=90):
+def execute_query(query, mode="intent", news_days=90, price_days=90):
     """
     Execute a user query using the specified mode.
     
@@ -50,7 +50,7 @@ def execute_query(query, mode="intent", news_days=30, price_days=90):
             "query": query
         }
 
-def execute_intent(query, intent, news_days=30, price_days=90):
+def execute_intent(query, intent, news_days=90, price_days=90):
     """
     Execute a specific intent directly, bypassing intent recognition.
     
