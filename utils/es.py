@@ -63,7 +63,7 @@ class ElasticsearchUtils:
         _cloud_id = cloud_id or os.getenv("ELASTICSEARCH_CLOUD_ID")
 
         connection_args = {
-            "timeout": timeout,
+            # "timeout": timeout,
             "max_retries": max_retries,
             "retry_on_timeout": retry_on_timeout
         }
@@ -78,7 +78,7 @@ class ElasticsearchUtils:
         elif _basic_auth[0] and _basic_auth[1]:
             connection_args["basic_auth"] = _basic_auth
         # Add other auth methods (bearer, etc.) if needed
-
+        print(f"Connection args: {connection_args}")
         try:
             self.client = Elasticsearch(**connection_args)
             # Test connection

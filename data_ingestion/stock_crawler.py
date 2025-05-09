@@ -13,7 +13,7 @@ def crawl_monthly_stock(tickers = ['MSFT', 'NVDA', 'GOOGL'], period="6mo"):
         }
     """
     results = {}
-    data = yf.download(tickers, period=period, interval="1mo")
+    data = yf.download(tickers, period=period, interval="1d")
 
     # -- 2 & 3. Tiền xử lý dữ liệu --
     results = {}
