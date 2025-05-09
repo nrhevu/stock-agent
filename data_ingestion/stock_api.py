@@ -13,10 +13,10 @@ def crawl_monthly_stock(tickers = ['MSFT', 'NVDA', 'GOOGL'], period="6mo"):
         }
     """
     results = {}
-    data = yf.download(tickers, period=period, interval="1d")
-    # start_date = "2000-01-01"
-    # end_date = "2025-05-09"
-    # data = yf.download(tickers, start=start_date, end=end_date, interval="1d")
+    # data = yf.download(tickers, period=period, interval="1d")
+    start_date = "2000-01-01"
+    end_date = "2025-05-09"
+    data = yf.download(tickers, start=start_date, end=end_date, interval="1d")
     # -- 2 & 3. Tiền xử lý dữ liệu --
     results = {}
     df_all = pd.DataFrame()
