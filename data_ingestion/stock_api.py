@@ -13,10 +13,10 @@ def crawl_monthly_stock(tickers = ['MSFT', 'NVDA', 'GOOGL'], period="6mo"):
         }
     """
     results = {}
-    data = yf.download(tickers, period=period, interval="1mo")
+    data = yf.download(tickers, period=period, interval="1d")
     # start_date = "2000-01-01"
     # end_date = "2025-05-09"
-    # data = yf.download(tickers, start=start_date, end=end_date, interval="1mo")
+    # data = yf.download(tickers, start=start_date, end=end_date, interval="1d")
     # -- 2 & 3. Tiền xử lý dữ liệu --
     results = {}
     df_all = pd.DataFrame()
@@ -32,6 +32,10 @@ def crawl_monthly_stock(tickers = ['MSFT', 'NVDA', 'GOOGL'], period="6mo"):
 
         # 3a. Tạo biến mục tiêu (Target)
         # Dự đoán giá đóng cửa tháng sau sẽ tăng (1) hay giảm/bằng (0) so với tháng này
+        df_ticker['Ticker'] = ticker
+        df_ticker.reset_index(inplace=True)
+        cols = ['Ticker'] + [col for col in df_ticker.columns if col != 'Ticker']
+        df_ticker = df_ticker[cols]
         df_ticker['Target'] = (df_ticker['Close'].shift(-1) > df_ticker['Close']).astype(int)
         df_ticker.dropna(inplace=True)
 
