@@ -9,3 +9,6 @@ sentencepiece==0.2.0
 sacremoses==0.1.1
 tqdm
 scrapy==2.12.0
+psycopg2-binary
+pandas
+sqlalchemy

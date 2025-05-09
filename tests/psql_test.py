@@ -267,3 +267,4 @@ def test_context_manager(get_db_params):
 
     except (OperationalError, Psycopg2Error) as e:
         pytest.fail(f"Context manager test failed during connection or query: {e}")
+        

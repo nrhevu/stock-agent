@@ -72,6 +72,7 @@ def execute_intent(query, intent, news_days=90, price_days=90):
         ticker = company_info.get("ticker")
         
         if intent == "retrieve_news":
+            print(f"Intent: {intent}, Company: {company_name}, Ticker: {ticker}")
             # Execute news retrieval
             news_result = stock_agent.news_retriever.run(company_name, news_days)
             return {
@@ -79,10 +80,13 @@ def execute_intent(query, intent, news_days=90, price_days=90):
                 "company_name": company_name,
                 "ticker": ticker,
                 "news_data": news_result.get("processed_news"),
-                "raw_news": news_result.get("raw_news")
+                "raw_news": news_result.get("raw_news"),
+                "result": news_result.get("processed_news") + "\n" + news_result.get("raw_news")
             }
             
         elif intent == "retrieve_stock":
+            print(f"Intent: {intent}, Company: {company_name}, Ticker: {ticker}")
+
             # Execute stock data retrieval
             stock_result = stock_agent.stock_data_retriever.run(ticker, price_days)
             return {
@@ -90,10 +94,13 @@ def execute_intent(query, intent, news_days=90, price_days=90):
                 "company_name": company_name,
                 "ticker": ticker,
                 "technical_analysis": stock_result.get("technical_analysis"),
-                "price_summary": stock_result.get("price_summary")
+                "price_summary": stock_result.get("price_summary"),
+                "result": stock_result.get("technical_analysis") + "\n" + stock_result.get("price_summary")
             }
             
         elif intent == "analyze_stock":
+            print(f"Intent: {intent}, Company: {company_name}, Ticker: {ticker}")
+
             # Execute full analysis
             news_result = stock_agent.news_retriever.run(company_name, news_days)
             processed_news = news_result.get("processed_news")
@@ -114,7 +121,8 @@ def execute_intent(query, intent, news_days=90, price_days=90):
                 "ticker": ticker,
                 "news_data": processed_news,
                 "technical_analysis": technical_analysis,
-                "prediction": prediction_result.get("prediction")
+                "prediction": prediction_result.get("prediction"),
+                "result": technical_analysis + "\n" + prediction_result.get("prediction")
             }
         else:
             return {

@@ -384,7 +384,8 @@ class StockPredictionMasterAgent:
                     "company_name": company_name,
                     "ticker": ticker,
                     "news_data": news_result.get("processed_news"),
-                    "raw_news": news_result.get("raw_news")
+                    "raw_news": news_result.get("raw_news"),
+                    "result": news_result.get("processed_news")
                 }
                 
             elif intent == IntentRecognitionAgent.INTENT_STOCK:
@@ -398,7 +399,8 @@ class StockPredictionMasterAgent:
                     "company_name": company_name,
                     "ticker": ticker,
                     "technical_analysis": stock_result.get("technical_analysis"),
-                    "price_summary": stock_result.get("price_summary")
+                    "price_summary": stock_result.get("price_summary"),
+                    "result": stock_result.get("technical_analysis") + "\n\n\n" + stock_result.get("raw_df").to_markdown()
                 }
                 
             elif intent == IntentRecognitionAgent.INTENT_ANALYSIS:
@@ -430,7 +432,8 @@ class StockPredictionMasterAgent:
                     "technical_analysis": technical_analysis,
                     "prediction": prediction_result.get("prediction"),
                     "raw_news": news_result.get("raw_news"),
-                    "price_summary": stock_result.get("price_summary")
+                    "price_summary": stock_result.get("price_summary"),
+                    "result": prediction_result.get("prediction")
                 }
                 
             else:
