@@ -7,6 +7,7 @@ torchvision== 0.21.0
 torchaudio==2.6.0
 sentencepiece==0.2.0
 sacremoses==0.1.1
+yfinance
 tqdm
 scrapy==2.12.0
 psycopg2-binary

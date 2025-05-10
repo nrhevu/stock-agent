@@ -177,3 +177,4 @@ docker/esdata
 test.py
 test.ipynb
 data/
+output/

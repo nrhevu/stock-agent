@@ -132,7 +132,7 @@ def crawl_stock_data():
     try:
         # Import the stock crawler
         sys.path.append(os.path.dirname(__file__))
-        from data_ingestion.stock_crawler import crawl_monthly_stock
+        from data_ingestion.stock_api import crawl_monthly_stock
         
         # Define the tickers to crawl
         tickers = ['MSFT', 'NVDA', 'GOOGL']

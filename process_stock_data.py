@@ -1,5 +1,6 @@
 import logging
 import os
+import argparse
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -16,19 +17,20 @@ except ImportError as e:
 load_dotenv()  # Load environment variables from .env file if present
 
 # --- Logging Configuration ---
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 # --- Database Configuration (via environment variables) ---
+
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = int(os.environ.get("DB_PORT", 5432))
 DB_NAME = os.environ.get("DB_NAME", "postgres")
 DB_USER = os.environ.get("DB_USER", "postgres")
 DB_PASS = os.environ.get("DB_PASS", "postgres")
 
-# --- Data & Table Configuration ---
-STOCK_DATA_DIR = "data/stock_data"  # Relative path to your stock data folder
+# --- Table Configuration ---
 TABLE_NAME = "stock_prices"         # Name for the target Postgres table
 
 # Columns expected to exist **in the incoming CSV files**
@@ -53,7 +55,6 @@ TARGET_DB_COLUMNS = [
     "volume",
 ]
 
-
 # ---------------------------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------------------------
@@ -73,13 +74,12 @@ def create_stock_table(pg_utils, table_name):
     );
     """
     try:
-        logging.info(f"Ensuring table '{table_name}' exists …")
+        logging.info(f"Ensuring table '{table_name}' exists ...")
         pg_utils.execute_query(create_table_sql)
         logging.info(f"Table '{table_name}' is ready.")
     except Psycopg2Error as e:
         logging.error(f"Failed to create or verify table '{table_name}': {e}")
         raise  # Stop the script if table creation fails
-
 
 def process_stock_file(filepath: str, fallback_ticker: str | None = None) -> pd.DataFrame | None:
     """Read and clean a single CSV file produced in the *new* format.
@@ -183,16 +183,15 @@ def process_stock_file(filepath: str, fallback_ticker: str | None = None) -> pd.
         logging.error("Error processing file %s: %s", filepath, e, exc_info=True)
         return None
 
-
 # ---------------------------------------------------------------------------
 # Main Orchestration Function
 # ---------------------------------------------------------------------------
 
-def main():
-    logging.info("Starting stock‑data ingestion process …")
-
-    if not os.path.isdir(STOCK_DATA_DIR):
-        logging.error(f"Stock data directory not found: {STOCK_DATA_DIR}")
+def main(stock_data_dir):
+    logging.info("Starting stock‑data ingestion process...")
+    
+    if not os.path.isdir(stock_data_dir):
+        logging.error(f"Stock data directory not found: {stock_data_dir}")
         return
 
     files_processed = 0
@@ -207,11 +206,11 @@ def main():
             create_stock_table(pg, TABLE_NAME)
 
             # Iterate through each CSV file in the directory
-            for filename in os.listdir(STOCK_DATA_DIR):
+            for filename in os.listdir(stock_data_dir):
                 if not filename.lower().endswith(".csv"):
                     continue  # Skip non‑CSV files
 
-                filepath = os.path.join(STOCK_DATA_DIR, filename)
+                filepath = os.path.join(stock_data_dir, filename)
 
                 # Fallback ticker extracted from filename (e.g. "AAPL" in "AAPL_data.csv")
                 fallback_ticker = (filename.split("_")[0] or "").upper()
@@ -226,7 +225,7 @@ def main():
                 # Push to database
                 try:
                     logging.info(
-                        f"Inserting {len(df_clean)} rows from {filename} into '{TABLE_NAME}' …"
+                        f"Inserting {len(df_clean)} rows from {filename} into '{TABLE_NAME}'..."
                     )
                     pg.push_dataframe_to_table(
                         df=df_clean,
@@ -247,6 +246,18 @@ def main():
     finally:
         logging.info("Ingestion finished – success: %s | failed: %s", files_processed, files_failed)
 
-
 if __name__ == "__main__":
-    main()
+    # Set up command line argument parsing
+    parser = argparse.ArgumentParser(description="Import stock data from CSV files into PostgreSQL")
+    parser.add_argument(
+        "--data-dir", 
+        type=str, 
+        default="data/stock_data",
+        help="Directory containing stock CSV files (default: data/stock_data)"
+    )
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Pass the data directory to the main function
+    main(args.data_dir)

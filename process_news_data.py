@@ -2,10 +2,11 @@ import json
 import logging
 from glob import glob
 from typing import Any, Dict, List
+from datetime import datetime, timezone
 
 from tqdm import tqdm
 
-from nlp.translate import parse_date, translate_text
+# from nlp.translate import parse_date, translate_text
 from utils.es import ElasticsearchUtils
 
 # --- Setup Logging ---
@@ -13,6 +14,25 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def parse_date(date_str: str) -> str | None:
+    """Converts DD/MM/YYYY to ISO 8601 format (UTC)."""
+    if not date_str:
+        return None
+    try:
+        # Parse as naive datetime first
+        dt_naive = datetime.strptime(date_str, "%d/%m/%Y")
+        # Assume the date is in UTC or your local timezone, then convert to UTC
+        # If dates are local, adjust accordingly e.g., using pytz
+        dt_utc = dt_naive.replace(tzinfo=timezone.utc)
+        return dt_utc.isoformat()
+    except ValueError:
+        logger.warning(f"Could not parse date: '{date_str}'. Skipping date field.")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error parsing date '{date_str}': {e}", exc_info=True)
+        return None
 
 
 def translate_and_index_to_elk(index_name: str, json_path: str, company: str) -> None:
@@ -52,9 +72,9 @@ def translate_and_index_to_elk(index_name: str, json_path: str, company: str) ->
             continue
 
         # Translate title
-        title_en = translate_text(title_vi)
-        if not title_en:
-            logger.warning(f"Translation failed for title: {title_vi[:50]}...")
+        # title_en = translate_text(title_vi)
+        # if not title_en:
+        #     logger.warning(f"Translation failed for title: {title_vi[:50]}...")
 
         # # Translate content if present
         # content_en = None
@@ -72,7 +92,7 @@ def translate_and_index_to_elk(index_name: str, json_path: str, company: str) ->
         # Build document
         doc = {
             'title_vi': title_vi,
-            'title_en': title_en,
+            # 'title_en': title_en,
             'content_vi': content_vi if content_vi.strip() else None,
             # 'content_en': content_en,
             'publish_date': publish_date,
