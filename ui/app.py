@@ -48,7 +48,6 @@ if prompt := st.chat_input("Nhập yêu cầu (ví dụ: 'tin tức và giá c�
                     # response = agent_executor.invoke({"input": prompt})
                     # assistant_response = response.get('output', "Sorry, I encountered an issue and couldn't get a response.")
                     response = stock_agent.run(prompt, use_agent=False)
-                    print(response)
                     assistant_response = response.get('result', "Sorry, I encountered an issue and couldn't get a response.")
 
                 # Display the final response

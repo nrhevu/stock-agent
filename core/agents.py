@@ -377,7 +377,7 @@ class StockPredictionMasterAgent:
                 # News retrieval intent
                 logger.info("Executing news retrieval workflow")
                 news_result = self.news_retriever.run(company_name, news_days)
-                
+                                
                 return {
                     "query": query,
                     "intent": intent,
@@ -385,7 +385,7 @@ class StockPredictionMasterAgent:
                     "ticker": ticker,
                     "news_data": news_result.get("processed_news"),
                     "raw_news": news_result.get("raw_news"),
-                    "result": news_result.get("processed_news")
+                    "result": news_result.get("processed_news") + "\n\n\n Các bài viết liên quan ```\n" + str(news_result.get("raw_news")) + "```"
                 }
                 
             elif intent == IntentRecognitionAgent.INTENT_STOCK:
@@ -400,7 +400,7 @@ class StockPredictionMasterAgent:
                     "ticker": ticker,
                     "technical_analysis": stock_result.get("technical_analysis"),
                     "price_summary": stock_result.get("price_summary"),
-                    "result": stock_result.get("technical_analysis") + "\n\n\n" + stock_result.get("raw_df").to_markdown()
+                    "result": stock_result.get("technical_analysis") + "\n\n\n Bảng giá cổ phiếu gần nhất: \n" + stock_result.get("raw_df").sort_values(by="date", ascending=False).to_markdown()
                 }
                 
             elif intent == IntentRecognitionAgent.INTENT_ANALYSIS:
@@ -422,7 +422,7 @@ class StockPredictionMasterAgent:
                     processed_news, 
                     technical_analysis
                 )
-                
+                                                
                 return {
                     "query": query,
                     "intent": intent,
