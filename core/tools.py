@@ -11,7 +11,7 @@ from langchain.pydantic_v1 import BaseModel, Field
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 
-from agent import ARTICLE_INDEX_NAME, PRICE_TABLE_NAME, es_utils, pg_utils
+from core import ARTICLE_INDEX_NAME, PRICE_TABLE_NAME, es_utils, pg_utils
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -32,16 +32,18 @@ class NewsSearchInput(BaseModel):
     )
 
 
-@tool("retrieve_news_articles", args_schema=NewsSearchInput)
+# @tool("retrieve_news_articles", args_schema=NewsSearchInput)
 def retrieve_news_articles(
-    str_args
+    company_name: str,
+    days_ago: int = 7,
+    max_results: int = 3,
 ) -> str:
     """Searches Elasticsearch index 'news_data' for articles about a specific company."""
     global es_utils
-    args = json.loads(str_args)
-    company_name: str = args.get("company_name")
-    days_ago: int = args.get("days_ago", 90)
-    max_results: int = args.get("max_results", 3)
+    # args = json.loads(str_args)
+    # company_name: str = args.get("company_name")
+    # days_ago: int = args.get("days_ago", 90)
+    # max_results: int = args.get("max_results", 3)
     if not es_utils:
         return "Error: Elasticsearch utility not initialized."
     logger.info(
@@ -113,9 +115,11 @@ class StockPriceDFInput(BaseModel):
     )
 
 
-@tool("retrieve_stock_prices_dataframe", args_schema=StockPriceDFInput)
+# @tool("retrieve_stock_prices_dataframe", args_schema=StockPriceDFInput)
 def retrieve_stock_prices_dataframe(
-    str_args
+    # str_args,
+    ticker: str,
+    days_ago: int = 90,
 ) -> pd.DataFrame | str:
     """
     Retrieves historical stock price data from Postgres DB as a Pandas DataFrame.
@@ -123,9 +127,9 @@ def retrieve_stock_prices_dataframe(
     Requires columns: date, open, high, low, close, volume.
     """
     global pg_utils
-    args = json.loads(str_args)
-    ticker: str = args.get("ticker")
-    days_ago: int = args.get("days_ago", 90)
+    # args = json.loads(str_args)
+    # ticker: str = args.get("ticker")
+    # days_ago: int = args.get("days_ago", 90)
     if not pg_utils:
         return "Error: PostgreSQL utility not initialized."
     logger.info(

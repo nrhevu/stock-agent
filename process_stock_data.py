@@ -1,5 +1,6 @@
 import logging
 import os
+import argparse
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -14,110 +15,163 @@ except ImportError as e:
     exit(1)  # Exit if the essential utility can't be imported
 
 load_dotenv()  # Load environment variables from .env file if present
-# --- Configuration ---
+
+# --- Logging Configuration ---
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# --- !! IMPORTANT !! ---
-# Use Environment Variables (Recommended)
+# --- Database Configuration (via environment variables) ---
+
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = int(os.environ.get("DB_PORT", 5432))
-DB_NAME = os.environ.get("DB_NAME", "postgres")  # Choose your DB name
-DB_USER = os.environ.get("DB_USER", "postgres")  # Choose your DB user
-DB_PASS = os.environ.get("DB_PASS", "postgres")  # Choose your DB password
+DB_NAME = os.environ.get("DB_NAME", "postgres")
+DB_USER = os.environ.get("DB_USER", "postgres")
+DB_PASS = os.environ.get("DB_PASS", "postgres")
 
-# Define the stock data directory and target table name
-STOCK_DATA_DIR = "data/stock_data"  # Relative path to your stock data folder
-TABLE_NAME = "stock_prices"  # Name for the target Postgres table
+# --- Table Configuration ---
+TABLE_NAME = "stock_prices"         # Name for the target Postgres table
 
-# Define expected columns based on the data rows (after skipping headers)
-# The first column in the data rows is the date.
-EXPECTED_CSV_COLUMNS = ["Date", "Close", "High", "Low", "Open", "Volume"]
+# Columns expected to exist **in the incoming CSV files**
+REQUIRED_COLUMNS = [
+    "Ticker",  # New format explicitly contains ticker per row
+    "Date",
+    "Open",
+    "High",
+    "Low",
+    "Close",
+    "Volume",
+]
 
-# Define target database columns (lowercase convention)
-TARGET_DB_COLUMNS = ["ticker", "date", "open", "high", "low", "close", "volume"]
+# Target database columns (follow lowercase naming convention)
+TARGET_DB_COLUMNS = [
+    "ticker",
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+]
 
+# ---------------------------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------------------------
 
 def create_stock_table(pg_utils, table_name):
-    """Creates the stock prices table if it doesn't exist."""
+    """Create the stock_prices table if it does not already exist."""
     create_table_sql = f"""
     CREATE TABLE IF NOT EXISTS public.{table_name} (
         ticker VARCHAR(10) NOT NULL,
-        date DATE NOT NULL,
-        open NUMERIC(15, 6),  -- Adjust precision as needed
-        high NUMERIC(15, 6),
-        low NUMERIC(15, 6),
-        close NUMERIC(15, 6),
+        date   DATE        NOT NULL,
+        open   NUMERIC(15, 6),
+        high   NUMERIC(15, 6),
+        low    NUMERIC(15, 6),
+        close  NUMERIC(15, 6),
         volume BIGINT,
-        PRIMARY KEY (ticker, date) -- Composite primary key
+        PRIMARY KEY (ticker, date)
     );
     """
     try:
-        logging.info(f"Ensuring table '{table_name}' exists...")
+        logging.info(f"Ensuring table '{table_name}' exists ...")
         pg_utils.execute_query(create_table_sql)
         logging.info(f"Table '{table_name}' is ready.")
     except Psycopg2Error as e:
         logging.error(f"Failed to create or verify table '{table_name}': {e}")
-        raise  # Re-raise the error to stop the script if table creation fails
+        raise  # Stop the script if table creation fails
 
+def process_stock_file(filepath: str, fallback_ticker: str | None = None) -> pd.DataFrame | None:
+    """Read and clean a single CSV file produced in the *new* format.
 
-def process_stock_file(filepath, ticker):
-    """Reads and processes a single stock CSV file."""
-    logging.info(f"Processing file: {filepath} for ticker: {ticker}")
+    The new format looks like:
+
+        ,Ticker,Date,Close,High,Low,Open,Volume,Target
+        0,GOOGL,2004-08-19, …
+
+    The first unnamed column is an export-created index — it will be dropped.
+    The trailing ``Target`` column is not needed for the price table and will
+    likewise be removed.
+    """
+
+    logging.info(f"Processing file: {filepath}")
+
     try:
-        # Read CSV, skip the first 3 header rows. Assign names based on data order.
-        df = pd.read_csv(filepath, skiprows=3, header=None, names=EXPECTED_CSV_COLUMNS)
+        # Read with header; do *not* skip rows – new format already has a header
+        df = pd.read_csv(filepath)
 
-        if df.empty:
-            logging.warning(f"File {filepath} is empty or has no data rows.")
-            return None
+        # ------------------------------------------------------------------
+        # 1️⃣  Drop any automatically‑generated index column (usually "Unnamed: 0")
+        # ------------------------------------------------------------------
+        unnamed_cols = [c for c in df.columns if c.lower().startswith("unnamed") or c == ""]
+        if unnamed_cols:
+            df.drop(columns=unnamed_cols, inplace=True)
 
-        # 1. Add Ticker column
-        df["ticker"] = ticker.upper()  # Standardize ticker to uppercase
+        # ------------------------------------------------------------------
+        # 2️⃣  Validate required columns
+        # ------------------------------------------------------------------
+        missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+        if missing:
+            raise ValueError(f"Missing required column(s): {', '.join(missing)}")
 
-        # 2. Convert 'Date' column to datetime objects
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")  # Coerce errors to NaT
+        # ------------------------------------------------------------------
+        # 3️⃣  Ensure ticker column is present / standardised
+        # ------------------------------------------------------------------
+        if df["Ticker"].isna().all():
+            if not fallback_ticker:
+                raise ValueError("Ticker column is empty and no fallback_ticker supplied.")
+            df["Ticker"] = fallback_ticker.upper()
+        else:
+            df["Ticker"] = df["Ticker"].str.upper().fillna(fallback_ticker or "")
 
-        # 3. Convert numeric columns
+        # ------------------------------------------------------------------
+        # 4️⃣  Remove columns we do not store (e.g. "Target")
+        # ------------------------------------------------------------------
+        df.drop(columns=[c for c in df.columns if c not in REQUIRED_COLUMNS], inplace=True, errors="ignore")
+
+        # ------------------------------------------------------------------
+        # 5️⃣  Type conversions
+        # ------------------------------------------------------------------
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
         numeric_cols = ["Open", "High", "Low", "Close", "Volume"]
-        for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col], errors="coerce")  # Coerce errors to NaN
+        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
 
-        # 4. Handle missing values (NaT in Date, NaN in numerics)
-        #    Drop rows where critical info (Date, Close) is missing
-        initial_rows = len(df)
+        # ------------------------------------------------------------------
+        # 6️⃣  Drop rows with critical NA values
+        # ------------------------------------------------------------------
+        before = len(df)
         df.dropna(subset=["Date"] + numeric_cols, inplace=True)
-        if len(df) < initial_rows:
-            logging.warning(
-                f"Dropped {initial_rows - len(df)} rows with missing values from {filepath}"
-            )
+        dropped = before - len(df)
+        if dropped:
+            logging.warning(f"Dropped {dropped} incomplete rows from {os.path.basename(filepath)}")
 
         if df.empty:
-            logging.warning(f"DataFrame became empty after cleaning {filepath}")
+            logging.warning(f"No usable data in {filepath} after cleaning; skipping file.")
             return None
 
-        # 5. Rename columns to match database schema (lowercase)
+        # ------------------------------------------------------------------
+        # 7️⃣  Rename columns to DB‑friendly names & final ordering
+        # ------------------------------------------------------------------
         df.rename(
             columns={
+                "Ticker": "ticker",
                 "Date": "date",
                 "Open": "open",
                 "High": "high",
                 "Low": "low",
                 "Close": "close",
                 "Volume": "volume",
-                # 'ticker' is already correct
             },
             inplace=True,
         )
 
-        # 6. Ensure 'date' column is just date (not timestamp) if needed
-        df["date"] = df["date"].dt.date
+        # Keep only the columns we actually insert and ensure correct order
+        df = df[TARGET_DB_COLUMNS]
 
-        # 7. Select and reorder columns for insertion
-        df_processed = df[TARGET_DB_COLUMNS]
+        # Ensure 'date' is pure date (not datetime)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
 
-        return df_processed
+        return df
 
     except FileNotFoundError:
         logging.error(f"File not found: {filepath}")
@@ -126,93 +180,84 @@ def process_stock_file(filepath, ticker):
         logging.warning(f"File is empty: {filepath}")
         return None
     except Exception as e:
-        logging.error(
-            f"Error processing file {filepath}: {e}", exc_info=True
-        )  # Log traceback
+        logging.error("Error processing file %s: %s", filepath, e, exc_info=True)
         return None
 
+# ---------------------------------------------------------------------------
+# Main Orchestration Function
+# ---------------------------------------------------------------------------
 
-def main():
-    """Main function to orchestrate the data ingestion."""
-    logging.info("Starting stock data ingestion process...")
-
-    # Check if data directory exists
-    if not os.path.isdir(STOCK_DATA_DIR):
-        logging.error(f"Stock data directory not found: {STOCK_DATA_DIR}")
-        return  # Exit if data source is missing
+def main(stock_data_dir):
+    logging.info("Starting stock‑data ingestion process...")
+    
+    if not os.path.isdir(stock_data_dir):
+        logging.error(f"Stock data directory not found: {stock_data_dir}")
+        return
 
     files_processed = 0
     files_failed = 0
 
     try:
-        # Use context manager for automatic connection handling
-        with PostgresUtils(DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT) as pg_utils:
+        # Use PostgresUtils as a context manager for automatic connection handling
+        with PostgresUtils(DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT) as pg:
             logging.info("Database connection established.")
 
-            # Create the target table if it doesn't exist
-            create_stock_table(pg_utils, TABLE_NAME)
+            # Ensure target table exists
+            create_stock_table(pg, TABLE_NAME)
 
-            # Iterate through files in the stock data directory
-            for filename in os.listdir(STOCK_DATA_DIR):
-                if filename.lower().endswith(".csv"):
-                    filepath = os.path.join(STOCK_DATA_DIR, filename)
+            # Iterate through each CSV file in the directory
+            for filename in os.listdir(stock_data_dir):
+                if not filename.lower().endswith(".csv"):
+                    continue  # Skip non‑CSV files
 
-                    # Extract ticker from filename (e.g., "MSFT" from "MSFT_1year_monthly.csv")
-                    try:
-                        ticker = filename.split("_")[0]
-                        if not ticker:  # Handle cases like "_something.csv"
-                            raise ValueError("Could not extract ticker")
-                    except Exception:
-                        logging.warning(
-                            f"Could not extract ticker from filename: {filename}. Skipping."
-                        )
-                        files_failed += 1
-                        continue
+                filepath = os.path.join(stock_data_dir, filename)
 
-                    # Process the file into a DataFrame
-                    processed_df = process_stock_file(filepath, ticker)
+                # Fallback ticker extracted from filename (e.g. "AAPL" in "AAPL_data.csv")
+                fallback_ticker = (filename.split("_")[0] or "").upper()
 
-                    # Push the DataFrame to the database
-                    if processed_df is not None and not processed_df.empty:
-                        try:
-                            logging.info(
-                                f"Pushing {len(processed_df)} rows for ticker {ticker} to table '{TABLE_NAME}'..."
-                            )
-                            pg_utils.push_dataframe_to_table(
-                                df=processed_df,
-                                table_name=TABLE_NAME,
-                                if_exists="append",  # Append data
-                                index=False,
-                                chunksize=1000,  # Use chunking for potentially large files
-                            )
-                            logging.info(f"Successfully pushed data for {ticker}.")
-                            files_processed += 1
-                        except Exception as push_error:  # Catch errors during push
-                            logging.error(
-                                f"Failed to push data for {ticker} from {filename}: {push_error}"
-                            )
-                            files_failed += 1
-                            # Decide if you want to continue with other files or stop
-                            # continue
-                    elif processed_df is None:
-                        files_failed += 1
-                    else:  # Empty dataframe after processing
-                        logging.info(
-                            f"Skipping push for {ticker} as processed data was empty."
-                        )
+                # Process file
+                df_clean = process_stock_file(filepath, fallback_ticker=fallback_ticker)
 
-    except (ImportError, OperationalError, Psycopg2Error, Exception) as e:
-        logging.error(
-            f"An error occurred during the ingestion process: {e}", exc_info=True
-        )  # Log traceback
-        # Ensure connection is closed if error happens outside the 'with' block or during init
-        # The 'with' block handles closing if init was successful
+                if df_clean is None or df_clean.empty:
+                    files_failed += 1
+                    continue
 
+                # Push to database
+                try:
+                    logging.info(
+                        f"Inserting {len(df_clean)} rows from {filename} into '{TABLE_NAME}'..."
+                    )
+                    pg.push_dataframe_to_table(
+                        df=df_clean,
+                        table_name=TABLE_NAME,
+                        if_exists="append",
+                        index=False,
+                        chunksize=1000,
+                    )
+                    files_processed += 1
+                except Exception as push_err:
+                    logging.error(f"Failed to push data from {filename}: {push_err}")
+                    files_failed += 1
+
+    except (ImportError, OperationalError, Psycopg2Error) as db_err:
+        logging.error("Database‑related error: %s", db_err, exc_info=True)
+    except Exception as err:
+        logging.error("Unexpected error: %s", err, exc_info=True)
     finally:
-        logging.info("Stock data ingestion process finished.")
-        logging.info(f"Files processed successfully: {files_processed}")
-        logging.info(f"Files failed or skipped: {files_failed}")
-
+        logging.info("Ingestion finished – success: %s | failed: %s", files_processed, files_failed)
 
 if __name__ == "__main__":
-    main()
+    # Set up command line argument parsing
+    parser = argparse.ArgumentParser(description="Import stock data from CSV files into PostgreSQL")
+    parser.add_argument(
+        "--data-dir", 
+        type=str, 
+        default="data/stock_data",
+        help="Directory containing stock CSV files (default: data/stock_data)"
+    )
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Pass the data directory to the main function
+    main(args.data_dir)
