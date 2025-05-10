@@ -151,12 +151,18 @@ The system supports three execution modes:
 
 ### Crawl News Data
 ```bash
+# crawl data
 scrapy data_ingestion/new_crawlers/crawl crawler -a keyword={{company_id}} -o path/to/news_data/{{company_id}}.json
+# process data
+python process_news_data.py --data-dir path/to/news_data
 ```
 
 ### Crawl Stock Data
 ```bash
+# crawl data
 python data_ingestion/stock_api.py --save-dir path/to/stock_data --tickers {{TICKER_ID}}
+# process data
+python process_stock_data.py --data-dir path/to/stock_data
 ```
 
 ### Airflow Orchestration
