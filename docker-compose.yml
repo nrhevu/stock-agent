@@ -49,7 +49,7 @@ x-airflow-common:
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
   image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.6.3}
-  platform: linux/arm64
+  platform: linux/amd64
   # build: .
   environment:
     &airflow-common-env
@@ -71,6 +71,7 @@ x-airflow-common:
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    WORKSPACE_DIR: ${PWD:-.}
   volumes:
     - ./orchestration/dags:/opt/airflow/dags
     - airflow-logs:/opt/airflow/logs
@@ -88,7 +89,7 @@ x-airflow-common:
 services:
   postgres-airflow:
     image: postgres:13
-    platform: linux/arm64
+    platform: linux/amd64
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -103,7 +104,7 @@ services:
 
   postgres:
     image: postgres:13
-    platform: linux/arm64
+    platform: linux/amd64
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -120,7 +121,7 @@ services:
 
   redis:
     image: redis:latest
-    platform: linux/arm64
+    platform: linux/amd64
     ports:
       - 6379:6379
     healthcheck:
@@ -133,7 +134,7 @@ services:
   # Feast Feature Store
   # feast:
   #   image: python:3.9-slim
-  #   platform: linux/arm64
+  #   platform: linux/amd64
   #   volumes:
   #     - ./feast:/app
   #   working_dir: /app
@@ -154,7 +155,7 @@ services:
       - es-data-volume:/usr/share/elasticsearch/data
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.16.3-arm64
+    image: docker.elastic.co/kibana/kibana:8.16.3
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=elasticsearch

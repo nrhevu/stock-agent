@@ -10,5 +10,5 @@ sacremoses==0.1.1
 tqdm
 scrapy==2.12.0
 psycopg2-binary
-pandas
+pandas==2.1.4
 sqlalchemy

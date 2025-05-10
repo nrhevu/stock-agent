@@ -49,7 +49,7 @@ with DAG(
             "day=\"{{ ti.xcom_pull(task_ids='get_date') }}\" && "
             'echo "Running job for day: $day" && '
             # place your real command below; $day is available
-            "docker run --rm -v /Users/rhevu/Works/Projects/stock-agent/:/app -w /app nrhevu/stock-runner:v1.0 mkdir -p data/news_data/$day"
+            "docker run --rm -v $WORKSPACE_DIR:/app -w /app nrhevu/stock-runner:v1.0 mkdir -p data/news_data/$day"
         ),
     )
 
@@ -59,7 +59,7 @@ with DAG(
         bash_command=(
             "day=\"{{ ti.xcom_pull(task_ids='get_date') }}\" && "
             'echo "Running crawl nvidia data day: $day" && '
-            'docker run --rm -v /Users/rhevu/Works/Projects/stock-agent/:/app -w /app/data_ingestion/new_crawlers/ nrhevu/stock-runner:v1.0 scrapy crawl crawler -a keyword="nvidia" -o /app/data/news_data/$day/nvidia.json'
+            'docker run --rm -v $WORKSPACE_DIR:/app -w /app/data_ingestion/new_crawlers/ nrhevu/stock-runner:v1.0 scrapy crawl crawler -a keyword="nvidia" -o /app/data/news_data/$day/nvidia.json'
         ),
     )
 
@@ -68,7 +68,7 @@ with DAG(
         bash_command=(
             "day=\"{{ ti.xcom_pull(task_ids='get_date') }}\" && "
             'echo "Running crawl google data for day: $day" && '
-            'docker run --rm -v /Users/rhevu/Works/Projects/stock-agent/:/app -w /app/data_ingestion/new_crawlers/ nrhevu/stock-runner:v1.0 scrapy crawl crawler -a keyword="google" -o /app/data/news_data/$day/google.json'
+            'docker run --rm -v $WORKSPACE_DIR:/app -w /app/data_ingestion/new_crawlers/ nrhevu/stock-runner:v1.0 scrapy crawl crawler -a keyword="google" -o /app/data/news_data/$day/google.json'
         ),
     )
 
@@ -77,7 +77,7 @@ with DAG(
         bash_command=(
             "day=\"{{ ti.xcom_pull(task_ids='get_date') }}\" && "
             'echo "Running crawl microsoft data for day: $day" && '
-            'docker run --rm -v /Users/rhevu/Works/Projects/stock-agent/:/app -w /app/data_ingestion/new_crawlers/ nrhevu/stock-runner:v1.0 scrapy crawl crawler -a keyword="microsoft" -o /app/data/news_data/$day/microsoft.json'
+            'docker run --rm -v $WORKSPACE_DIR:/app -w /app/data_ingestion/new_crawlers/ nrhevu/stock-runner:v1.0 scrapy crawl crawler -a keyword="microsoft" -o /app/data/news_data/$day/microsoft.json'
         ),
     )
 
@@ -86,7 +86,7 @@ with DAG(
         bash_command=(
             "day=\"{{ ti.xcom_pull(task_ids='get_date') }}\" && "
             'echo "Running process data for day: $day" && '
-            "docker run --rm -v /Users/rhevu/Works/Projects/stock-agent/:/app -w /app --network=stock-agent_default -e ELASTICSEARCH_HOST=http://elasticsearch:9200 nrhevu/stock-runner:v1.0 python3 process_news_data.py --data-dir /app/data/news_data/$day/"
+            "docker run --rm -v $WORKSPACE_DIR:/app -w /app --network=stock-agent_default -e ELASTICSEARCH_HOST=http://elasticsearch:9200 nrhevu/stock-runner:v1.0 python3 process_news_data.py --data-dir /app/data/news_data/$day/"
         ),
     )
 
