@@ -58,7 +58,7 @@ def merge_csv(csv_1, csv_2):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Crawl monthly stock data and save CSVs.")
-    parser.add_argument("--save_dir", type=str, default="output", help="Directory to save CSV files")
+    parser.add_argument("--save-dir", type=str, default="output", help="Directory to save CSV files")
     parser.add_argument("--tickers", type=str, nargs="+", default=['MSFT', 'NVDA', 'GOOGL'], help="List of stock tickers")
     parser.add_argument("--period", type=str, default="6mo", help="Data period (e.g., 1d, 5d, 1mo, 6mo, 1y)")
 
