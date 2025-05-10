@@ -385,7 +385,7 @@ class StockPredictionMasterAgent:
                     "ticker": ticker,
                     "news_data": news_result.get("processed_news"),
                     "raw_news": news_result.get("raw_news"),
-                    "result": news_result.get("processed_news") + "\n\n\n Các bài viết liên quan ```\n" + str(news_result.get("raw_news")) + "```"
+                    "result": news_result.get("processed_news") + """\n\n\n Các bài viết liên quan \n ``` \n""" + str(news_result.get("raw_news")) + " \n```"
                 }
                 
             elif intent == IntentRecognitionAgent.INTENT_STOCK:
