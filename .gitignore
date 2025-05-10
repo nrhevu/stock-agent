@@ -176,5 +176,5 @@ cython_debug/
 docker/esdata
 test.py
 test.ipynb
-data/
+data/news_data
 output/
