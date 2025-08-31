@@ -1,3 +1,4 @@
+from datetime import datetime
 from scrapy import Spider
 import scrapy
 from scrapy.selector import Selector
@@ -14,11 +15,11 @@ class CrawlerSpider(Spider):
         self.keyword = keyword
     
         if keyword == "nvidia":
-            self.start_urls = [f"https://vietnamnet.vn/tim-kiem-p{i}?bydaterang=1&q=nvidia" for i in range(0,2)]
+            self.start_urls = [f"https://vietnamnet.vn/tim-kiem-p{i}?q=nvidia" for i in range(0,15)]
         elif keyword == "google":
-            self.start_urls = [f"https://vietnamnet.vn/tim-kiem-p{i}?q=Google&od=2&bydaterang=1&newstype=all" for i in range(0,2)]
+            self.start_urls = [f"https://vietnamnet.vn/tim-kiem-p{i}?q=google" for i in range(0,30)]
         elif keyword == "microsoft":
-            self.start_urls = [f"https://vietnamnet.vn/tim-kiem-p{i}?bydaterang=1&newstype=all&od=2&q=Microsoft" for i in range(0,2)]
+            self.start_urls = [f"https://vietnamnet.vn/tim-kiem-p{i}?q=microsoft" for i in range(0,15)]
 
     def clean_text(self,text):
     # Loại bỏ các ký tự thừa như \r, \n và khoảng trắng thừa
@@ -62,5 +63,9 @@ class CrawlerSpider(Spider):
         if self.keyword[1:] in title or self.keyword[1:] in content:
             item['title'] = self.clean_text(title)
             item['publish_date'] = self.extract_date(date)
+            threshold = datetime.strptime("19/05/2025", "%d/%m/%Y")
+            publish_date = datetime.strptime(self.extract_date(date), "%d/%m/%Y")
+            if publish_date < threshold:
+                return None
             item['content'] = self.clean_text(content)
             yield item
