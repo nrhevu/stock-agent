@@ -13,18 +13,21 @@ A comprehensive system for retrieving financial news, stock data, and generating
    docker compose -f docker/docker-compose-arm64.yml up -d
    ```
 
-2. Build Docker image:
+2. Install Dependencies:
+
+- Build Docker image:
    ```bash
    docker build -t nrhevu/stock-runner:v1.0 .
+   docker run --rm -v ./app nrhevu/stock-runner:v1.0 stock-agent bash
    ```
 
-3. Install dependencies:
+- Install with conda:
    ```bash
    conda create -n stockagent python=3.11
    pip install -r requirements.txt
    ```
 
-4. Export OpenAI API key:
+3. Export OpenAI API key:
    ```bash
    export OPENAI_API_KEY=your_api_key
    ```

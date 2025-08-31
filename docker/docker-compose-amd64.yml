@@ -71,6 +71,7 @@ x-airflow-common:
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    WORKSPACE_DIR: ${PWD:-.}
   volumes:
     - ./orchestration/dags:/opt/airflow/dags
     - airflow-logs:/opt/airflow/logs
